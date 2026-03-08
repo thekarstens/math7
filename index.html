@@ -20,23 +20,44 @@
             <option value="geometry">Geometry (Area/Circumference)</option>
             <option value="statistics">Statistics (Mean/Median)</option>
         </select>
+
         <label for="difficulty">Select Difficulty:</label>
         <select id="difficulty">
             <option value="easy">Easy</option>
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
         </select>
+
         <button id="start-button">Start</button>
+
         <div id="problem-container">
+            <!-- Teaching Mode (collapsible) -->
+            <details id="teaching-mode" class="teaching-mode" open>
+                <summary><strong>Teaching Mode</strong> (open for a mini-lesson + example)</summary>
+                <div id="teaching-content" class="teaching-content">
+                    Select a topic and press Start.
+                </div>
+            </details>
+
+            <!-- Problem + answer -->
             <div id="problem"></div>
+
+            <div id="hints" class="hints" style="display:none;">
+                <div class="hints-title"><strong>Hints</strong></div>
+                <div id="hint-content"></div>
+            </div>
+
             <input type="text" id="answer" placeholder="Your answer">
             <button id="submit-button">Submit</button>
-            <button id="toggle-solution">Show Step-by-Step Work</button>
+
+            <button id="toggle-solution" disabled title="Unlocks after 3 wrong attempts">Show Step-by-Step Work</button>
             <div id="solution" style="display:none;"></div>
+
             <div id="score">Score: 0</div>
             <div id="streak">Streak: 0</div>
         </div>
     </div>
+
     <script src="app.js"></script>
 </body>
 </html>
