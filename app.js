@@ -4,6 +4,11 @@
 // - mix of 7th grade topics
 // - "show work" toggle
 // - keeps best score in localStorage
+//
+// Teaching mode + progressive hints (Mode 2 requested):
+// - For Equations: show Hint 1 after first wrong, Hint 2 after second wrong,
+//   unlock Step-by-Step after 3 wrong attempts.
+// - Do NOT show the correct answer when wrong.
 
 const QUIZ_LEN = 10;
 
@@ -21,6 +26,12 @@ const toggleBtn = el("toggle-solution");
 const solutionEl = el("solution");
 const scoreEl = el("score");
 const streakEl = el("streak");
+
+// teaching + hints UI
+const teachingDetailsEl = el("teaching-mode");
+const teachingContentEl = el("teaching-content");
+const hintsBoxEl = el("hints");
+const hintContentEl = el("hint-content");
 
 // feedback area
 const feedbackEl = document.createElement("div");
@@ -103,6 +114,52 @@ function fmtExpected(expected) {
   return fracToString(s);
 }
 
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function setTeachingModeContent(p) {
+  // default fallback
+  const teaching = p.teaching || `Try the problem first. Use hints if needed, then check the step-by-step.`;
+  teachingContentEl.innerHTML = `<div>${escapeHtml(teaching).replaceAll("\n", "<br>")}</div>`;
+  // keep it open for equations so students see the concept
+  if (p.topicKey === "equations") teachingDetailsEl.open = true;
+}
+
+function resetHintsUI() {
+  hintsBoxEl.style.display = "none";
+  hintContentEl.innerHTML = "";
+}
+
+function renderHints(p) {
+  const hints = p.hints || [];
+  const shown = Math.min(p.attempts, hints.length);
+  if (shown <= 0) {
+    resetHintsUI();
+    return;
+  }
+  hintsBoxEl.style.display = "block";
+  hintContentEl.innerHTML = "";
+  for (let i = 0; i < shown; i++) {
+    const div = document.createElement("div");
+    div.textContent = `Hint ${i + 1}: ${hints[i]}`;
+    hintContentEl.appendChild(div);
+  }
+}
+
+function updateSolutionLockUI(p) {
+  const unlocked = !!p.solutionUnlocked;
+  toggleBtn.disabled = !unlocked;
+  toggleBtn.title = unlocked ? "" : "Unlocks after 3 wrong attempts";
+  if (!unlocked) {
+    solutionEl.style.display = "none";
+    toggleBtn.textContent = "Show Step-by-Step Work";
+  }
+}
+
 // Problem generators
 function makeProblem(topic, difficulty) {
   switch (topic) {
@@ -116,6 +173,14 @@ function makeProblem(topic, difficulty) {
     case "statistics": return makeStatistics(difficulty);
     default: return makeMixed(difficulty);
   }
+}
+
+function withTeachingState(p, topicKey) {
+  // attach state used by teaching/hints/solution lock
+  p.topicKey = topicKey;
+  p.attempts = 0;
+  p.solutionUnlocked = false;
+  return p;
 }
 
 function makeMixed(difficulty) {
@@ -136,38 +201,38 @@ function makeIntegers(difficulty) {
     b = choice([-12,-10,-8,-6,-5,-4,-3,-2,2,3,4,5,6,8,10,12]);
     const q = randInt(-12, 12);
     a = b * q;
-    return {
+    return withTeachingState({
       topic: "Integers/Rationals",
       prompt: `${a} ÷ ${b} = ?`,
       expected: { kind: "num", value: a / b },
       work: `We compute ${a} ÷ ${b}.\nBecause ${a} = ${b} × ${a/b}, the quotient is ${a/b}.`
-    };
+    }, "integers");
   }
 
   if (op === "×") {
-    return {
+    return withTeachingState({
       topic: "Integers/Rationals",
       prompt: `${a} × ${b} = ?`,
       expected: { kind: "num", value: a * b },
       work: `Multiply:\n${a} × ${b} = ${a*b}`
-    };
+    }, "integers");
   }
 
   if (op === "+") {
-    return {
+    return withTeachingState({
       topic: "Integers/Rationals",
       prompt: `${a} + ${b} = ?`,
       expected: { kind: "num", value: a + b },
       work: `Add:\n${a} + ${b} = ${a+b}`
-    };
+    }, "integers");
   }
 
-  return {
+  return withTeachingState({
     topic: "Integers/Rationals",
     prompt: `${a} − (${b}) = ?`,
     expected: { kind: "num", value: a - b },
     work: `Subtracting ${b} means add ${-b}:\n${a} + (${ -b }) = ${a-b}`
-  };
+  }, "integers");
 }
 
 function makeFractions(difficulty) {
@@ -189,7 +254,7 @@ function makeFractions(difficulty) {
   if (op === "×") {
     const rawN = f1.n * f2.n, rawD = f1.d * f2.d;
     const simp = simplifyFrac(rawN, rawD);
-    return {
+    return withTeachingState({
       topic: "Fractions/Decimals",
       prompt: `${s1} × ${s2} = ? (fraction or decimal)`,
       expected: { kind: "frac", n: simp.n, d: simp.d },
@@ -197,7 +262,7 @@ function makeFractions(difficulty) {
 `Multiply numerators and denominators:
 (${f1.n}/${f1.d}) × (${f2.n}/${f2.d}) = ${rawN}/${rawD}
 Simplify → ${simp.n}/${simp.d}`
-    };
+    }, "fractions");
   }
 
   const sign = op === "+" ? 1 : -1;
@@ -205,7 +270,7 @@ Simplify → ${simp.n}/${simp.d}`
   const rawD = f1.d * f2.d;
   const simp = simplifyFrac(rawN, rawD);
 
-  return {
+  return withTeachingState({
     topic: "Fractions/Decimals",
     prompt: `${s1} ${op} ${s2} = ? (fraction or decimal)`,
     expected: { kind: "frac", n: simp.n, d: simp.d },
@@ -213,7 +278,7 @@ Simplify → ${simp.n}/${simp.d}`
 `Common denominator: ${rawD}
 Combine: ${rawN}/${rawD}
 Simplify → ${simp.n}/${simp.d}`
-  };
+  }, "fractions");
 }
 
 function makeRatios(difficulty) {
@@ -223,12 +288,12 @@ function makeRatios(difficulty) {
     const items = difficulty === "easy" ? randInt(2, 8) : randInt(3, 12);
     const costPer = choice([1,2,3,4,5,6,7,8,9]);
     const total = items * costPer;
-    return {
+    return withTeachingState({
       topic: "Ratios/Proportions",
       prompt: `${items} notebooks cost $${total}. What is the cost per notebook?`,
       expected: { kind: "num", value: costPer },
       work: `Unit rate = ${total} ÷ ${items} = ${costPer}`
-    };
+    }, "ratios");
   }
 
   const a = randInt(2, 12);
@@ -244,12 +309,12 @@ function makeRatios(difficulty) {
         return { kind: "frac", n: simp.n, d: simp.d };
       })();
 
-  return {
+  return withTeachingState({
     topic: "Ratios/Proportions",
     prompt: `Solve for x: ${a}/${b} = ${c}/x`,
     expected,
     work: `Cross multiply: ${a}x = ${b}·${c} = ${b*c}\nSo x = ${b*c}/${a} = ${fmtExpected(expected)}`
-  };
+  }, "ratios");
 }
 
 function makePercent(difficulty) {
@@ -261,24 +326,24 @@ function makePercent(difficulty) {
     const value = base * (pct / 100);
     if ((difficulty !== "hard") && Math.abs(value - Math.round(value)) > 1e-9) return makePercent(difficulty);
     const v = (difficulty === "hard") ? Number(value.toFixed(2)) : Math.round(value);
-    return {
+    return withTeachingState({
       topic: "Percent",
       prompt: `What is ${pct}% of ${base}?`,
       expected: { kind: "num", value: v },
       work: `${pct}% = ${pct}/100\n${base} × ${pct/100} = ${v}`
-    };
+    }, "percent");
   }
 
   const price = base;
   const newPrice = price * (1 - pct/100);
   if ((difficulty !== "hard") && !Number.isInteger(newPrice)) return makePercent(difficulty);
   const v = (difficulty === "hard") ? Number(newPrice.toFixed(2)) : newPrice;
-  return {
+  return withTeachingState({
     topic: "Percent",
     prompt: `A $${price} item is discounted by ${pct}%. What is the new price?`,
     expected: { kind: "num", value: v },
     work: `New price = ${price} × (1 − ${pct/100}) = ${v}`
-  };
+  }, "percent");
 }
 
 function makeExpressions(difficulty) {
@@ -287,12 +352,12 @@ function makeExpressions(difficulty) {
     const a = randInt(-6, 10);
     const b = randInt(-10, 10);
     const val = a * x + b;
-    return {
+    return withTeachingState({
       topic: "Expressions",
       prompt: `Evaluate when x = ${x}:  ${a}x + ${b}`,
       expected: { kind: "num", value: val },
       work: `${a}(${x}) + ${b} = ${a*x} + ${b} = ${val}`
-    };
+    }, "expressions");
   }
 
   const x = randInt(-4, 8);
@@ -301,7 +366,7 @@ function makeExpressions(difficulty) {
   const c = randInt(-8, 8);
   const val = a * (x + b) + c;
 
-  return {
+  return withTeachingState({
     topic: "Expressions",
     prompt: `Evaluate when x = ${x}:  ${a}(x ${b>=0?"+":"-"} ${Math.abs(b)}) ${c>=0?"+":"-"} ${Math.abs(c)}`,
     expected: { kind: "num", value: val },
@@ -309,20 +374,42 @@ function makeExpressions(difficulty) {
 `Inside: x ${b>=0?"+":"-"} ${Math.abs(b)} = ${x+b}
 Multiply: ${a}(${x+b}) = ${a*(x+b)}
 Then add/subtract ${c}: ${val}`
-  };
+  }, "expressions");
 }
 
 function makeEquations(difficulty) {
+  // Teaching Mode content for equations (used for both easy and not-easy)
+  const teaching =
+`Goal: isolate x (get x by itself).
+Two-step order:
+1) Undo +/− first (move the constant).
+2) Undo ×/÷ second (move the coefficient).
+
+Worked example:
+Solve: 3x + 5 = 20
+Undo +5: 3x = 15
+Undo ×3: x = 5`;
+
   if (difficulty === "easy") {
     const x = randInt(-10, 15);
     const b = randInt(-12, 12);
     const c = x + b;
-    return {
+
+    const opSign = b >= 0 ? "+" : "-";
+    const undo = b >= 0 ? "subtract" : "add";
+
+    return withTeachingState({
       topic: "Equations",
-      prompt: `Solve for x:  x ${b>=0?"+":"-"} ${Math.abs(b)} = ${c}`,
+      prompt: `Solve for x:  x ${opSign} ${Math.abs(b)} = ${c}`,
       expected: { kind: "num", value: x },
-      work: `Undo the ${b>=0?"+":"-"} ${Math.abs(b)}:\nx = ${c} ${b>=0?"-":"+"} ${Math.abs(b)} = ${x}`
-    };
+      work: `Undo the ${opSign} ${Math.abs(b)}:\nx = ${c} ${b>=0?"-":"+"} ${Math.abs(b)} = ${x}`,
+      teaching,
+      hints: [
+        `To isolate x, ${undo} ${Math.abs(b)} on BOTH sides.`,
+        `After you move the constant, x will be alone.`,
+        `Do: x = ${c} ${b>=0?"-":"+"} ${Math.abs(b)}`
+      ]
+    }, "equations");
   }
 
   const a = choice([2,3,4,5,6,7,8,9]) * (Math.random() < 0.2 ? -1 : 1);
@@ -330,16 +417,25 @@ function makeEquations(difficulty) {
   const b = randInt(-12, 12);
   const c = a * x + b;
 
-  return {
+  const opSign = b >= 0 ? "+" : "-";
+  const undoConst = b >= 0 ? `subtract ${Math.abs(b)}` : `add ${Math.abs(b)}`;
+
+  return withTeachingState({
     topic: "Equations",
-    prompt: `Solve for x:  ${a}x ${b>=0?"+":"-"} ${Math.abs(b)} = ${c}`,
+    prompt: `Solve for x:  ${a}x ${opSign} ${Math.abs(b)} = ${c}`,
     expected: { kind: "num", value: x },
     work:
 `Undo +/− first:
 ${a}x = ${c} ${b>=0?"-":"+"} ${Math.abs(b)} = ${c-b}
 Divide by ${a}:
-x = (${c-b})/${a} = ${x}`
-  };
+x = (${c-b})/${a} = ${x}`,
+    teaching,
+    hints: [
+      `Step 1: ${undoConst} on BOTH sides to move the constant.`,
+      `Step 2: after that you will have ${a}x = (something). Then divide BOTH sides by ${a}.`,
+      `Compute: ${a}x = ${c} ${b>=0?"-":"+"} ${Math.abs(b)}. Then x = (${c-b})/${a}.`
+    ]
+  }, "equations");
 }
 
 function makeGeometry(difficulty) {
@@ -349,23 +445,23 @@ function makeGeometry(difficulty) {
     const r = difficulty === "easy" ? randInt(2, 8) : randInt(3, 14);
     const C = 2 * 3.14 * r;
     const ans = Number(C.toFixed(2));
-    return {
+    return withTeachingState({
       topic: "Geometry",
       prompt: `A circle has radius r = ${r}. Using π ≈ 3.14, what is the circumference? (round to 2 decimals)`,
       expected: { kind: "num", value: ans },
       work: `C = 2πr ≈ 2 × 3.14 × ${r} = ${ans}`
-    };
+    }, "geometry");
   }
 
   if (mode === "rectArea") {
     const l = randInt(4, 30);
     const w = randInt(3, 20);
-    return {
+    return withTeachingState({
       topic: "Geometry",
       prompt: `Find the area of a rectangle with length ${l} and width ${w}.`,
       expected: { kind: "num", value: l * w },
       work: `A = ${l} × ${w} = ${l*w}`
-    };
+    }, "geometry");
   }
 
   const b = randInt(4, 30);
@@ -373,12 +469,12 @@ function makeGeometry(difficulty) {
   const A = (b * h) / 2;
   if ((difficulty !== "hard") && !Number.isInteger(A)) return makeGeometry(difficulty);
   const ans = (difficulty === "hard") ? Number(A.toFixed(1)) : A;
-  return {
+  return withTeachingState({
     topic: "Geometry",
     prompt: `Find the area of a triangle with base ${b} and height ${h}.`,
     expected: { kind: "num", value: ans },
     work: `A = (1/2)bh = (1/2) × ${b} × ${h} = ${ans}`
-  };
+  }, "geometry");
 }
 
 function makeStatistics(difficulty) {
@@ -392,21 +488,21 @@ function makeStatistics(difficulty) {
     const mean = sum / len;
     if ((difficulty !== "hard") && !Number.isInteger(mean)) return makeStatistics(difficulty);
     const ans = (difficulty === "hard") ? Number(mean.toFixed(2)) : mean;
-    return {
+    return withTeachingState({
       topic: "Statistics",
       prompt: `Find the mean of: ${data.join(", ")}`,
       expected: { kind: "num", value: ans },
       work: `Sum = ${sum}, Count = ${len}\nMean = ${sum} ÷ ${len} = ${ans}`
-    };
+    }, "statistics");
   }
 
   const median = sorted[Math.floor(len/2)];
-  return {
+  return withTeachingState({
     topic: "Statistics",
     prompt: `Find the median of: ${data.join(", ")}`,
     expected: { kind: "num", value: median },
     work: `Sorted: ${sorted.join(", ")}\nMiddle value = ${median}`
-  };
+  }, "statistics");
 }
 
 // Quiz UI
@@ -425,6 +521,11 @@ function showProblem() {
   solutionEl.textContent = p.work || "";
   solutionEl.style.display = "none";
   toggleBtn.textContent = "Show Step-by-Step Work";
+
+  // reset teaching/hints/solution lock
+  setTeachingModeContent(p);
+  resetHintsUI();
+  updateSolutionLockUI(p);
 
   setScoreUI();
 }
@@ -460,17 +561,47 @@ function grade() {
     quiz.score++;
     quiz.streak++;
     feedbackEl.textContent = "Correct!";
+
+    // optionally unlock on correct too (nice UX)
+    p.solutionUnlocked = true;
+    updateSolutionLockUI(p);
+
   } else {
     quiz.streak = 0;
-    feedbackEl.textContent = `Not quite. Correct answer: ${fmtExpected(p.expected)}`;
+
+    // track attempts for hints/unlock
+    p.attempts = (p.attempts || 0) + 1;
+
+    if (p.topicKey === "equations") {
+      // show progressive hints and unlock after 3 wrong attempts
+      renderHints(p);
+
+      if (p.attempts >= 3) {
+        p.solutionUnlocked = true;
+        updateSolutionLockUI(p);
+        feedbackEl.textContent = "Still stuck? Step-by-step is now unlocked.";
+      } else {
+        feedbackEl.textContent = `Not quite. Try again (attempt ${p.attempts}/3). A hint is available above.`;
+      }
+
+      // IMPORTANT: do NOT reveal correct answer
+    } else {
+      // keep old behavior for other topics (you can extend later)
+      feedbackEl.textContent = "Not quite. Try again.";
+    }
   }
+
   setScoreUI();
 
-  submitBtn.disabled = true;
-  setTimeout(() => {
-    submitBtn.disabled = false;
-    nextProblem();
-  }, 850);
+  // For equations we want them to try again on the SAME problem,
+  // not immediately skip to the next one.
+  if (ok) {
+    submitBtn.disabled = true;
+    setTimeout(() => {
+      submitBtn.disabled = false;
+      nextProblem();
+    }, 850);
+  }
 }
 
 function startQuiz() {
@@ -495,6 +626,9 @@ submitBtn.addEventListener("click", (e) => { e.preventDefault(); grade(); });
 answerEl.addEventListener("keydown", (e) => { if (e.key === "Enter") grade(); });
 
 toggleBtn.addEventListener("click", () => {
+  const p = quiz?.current;
+  if (!p || !p.solutionUnlocked) return; // extra safety
+
   const isHidden = solutionEl.style.display === "none";
   solutionEl.style.display = isHidden ? "block" : "none";
   toggleBtn.textContent = isHidden ? "Hide Step-by-Step Work" : "Show Step-by-Step Work";
