@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7th Grade Math Practice</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>7th Grade Math Practice</h1>
+        <label for="topic">Select Topic:</label>
+        <select id="topic">
+            <option value="integers">Integers/Rationals</option>
+            <option value="fractions">Fractions/Decimals</option>
+            <option value="ratios">Ratios/Proportions</option>
+            <option value="percent">Percent</option>
+            <option value="expressions">Expressions</option>
+            <option value="equations">Equations (One-step & Two-step)</option>
+            <option value="geometry">Geometry (Area/Circumference)</option>
+            <option value="statistics">Statistics (Mean/Median)</option>
+        </select>
+        <label for="difficulty">Select Difficulty:</label>
+        <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+        </select>
+        <button id="start-button">Start</button>
+        <div id="problem-container">
+            <div id="problem"></div>
+            <input type="text" id="answer" placeholder="Your answer">
+            <button id="submit-button">Submit</button>
+            <button id="toggle-solution">Show Step-by-Step Work</button>
+            <div id="solution" style="display:none;"></div>
+            <div id="score">Score: 0</div>
+            <div id="streak">Streak: 0</div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
