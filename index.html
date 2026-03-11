@@ -42,6 +42,20 @@
             <!-- Problem + answer -->
             <div id="problem"></div>
 
+            <!-- Scratch Paper (auto-clears each new problem) -->
+            <details id="scratchpad" class="scratchpad" open>
+                <summary><strong>Scratch Paper</strong> (draw with mouse/touch)</summary>
+
+                <div class="scratchpad-toolbar">
+                    <label for="scratch-size"><strong>Pencil size</strong></label>
+                    <input id="scratch-size" type="range" min="1" max="12" value="3">
+                    <button id="scratch-clear" type="button">Clear</button>
+                </div>
+
+                <canvas id="scratch-canvas" width="680" height="260"></canvas>
+                <div class="scratchpad-note">Tip: works with mouse or touch.</div>
+            </details>
+
             <div id="hints" class="hints" style="display:none;">
                 <div class="hints-title"><strong>Hints</strong></div>
                 <div id="hint-content"></div>
