@@ -33,6 +33,11 @@ const teachingContentEl = el("teaching-content");
 const hintsBoxEl = el("hints");
 const hintContentEl = el("hint-content");
 
+// scratchpad UI
+const scratchCanvas = el("scratch-canvas");
+const scratchClearBtn = el("scratch-clear");
+const scratchSizeEl = el("scratch-size");
+
 // feedback area
 const feedbackEl = document.createElement("div");
 feedbackEl.className = "feedback";
@@ -158,6 +163,75 @@ function updateSolutionLockUI(p) {
     solutionEl.style.display = "none";
     toggleBtn.textContent = "Show Step-by-Step Work";
   }
+}
+
+/* Scratchpad (NEW) */
+function clearScratchpadIfPresent() {
+  if (!scratchCanvas) return;
+  const ctx = scratchCanvas.getContext("2d");
+  ctx.clearRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+}
+
+function initScratchpad() {
+  if (!scratchCanvas) return;
+
+  const ctx = scratchCanvas.getContext("2d");
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#111";
+
+  const getPos = (evt) => {
+    const rect = scratchCanvas.getBoundingClientRect();
+    const clientX = (evt.touches ? evt.touches[0].clientX : evt.clientX);
+    const clientY = (evt.touches ? evt.touches[0].clientY : evt.clientY);
+    return {
+      x: (clientX - rect.left) * (scratchCanvas.width / rect.width),
+      y: (clientY - rect.top) * (scratchCanvas.height / rect.height),
+    };
+  };
+
+  let drawing = false;
+  let last = null;
+
+  const start = (evt) => {
+    drawing = true;
+    last = getPos(evt);
+    evt.preventDefault();
+  };
+
+  const move = (evt) => {
+    if (!drawing) return;
+    const cur = getPos(evt);
+    ctx.lineWidth = Number(scratchSizeEl?.value || 3);
+
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(cur.x, cur.y);
+    ctx.stroke();
+
+    last = cur;
+    evt.preventDefault();
+  };
+
+  const end = (evt) => {
+    drawing = false;
+    last = null;
+    evt?.preventDefault?.();
+  };
+
+  // Mouse
+  scratchCanvas.addEventListener("mousedown", start);
+  window.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", end);
+
+  // Touch
+  scratchCanvas.addEventListener("touchstart", start, { passive: false });
+  scratchCanvas.addEventListener("touchmove", move, { passive: false });
+  scratchCanvas.addEventListener("touchend", end, { passive: false });
+
+  scratchClearBtn?.addEventListener("click", () => {
+    clearScratchpadIfPresent();
+  });
 }
 
 // Problem generators
@@ -514,6 +588,10 @@ function setScoreUI() {
 function showProblem() {
   const p = quiz.current;
   problemEl.textContent = p.prompt;
+
+  // NEW: auto-clear scratch paper on each new problem
+  clearScratchpadIfPresent();
+
   answerEl.value = "";
   answerEl.focus();
 
@@ -633,3 +711,6 @@ toggleBtn.addEventListener("click", () => {
   solutionEl.style.display = isHidden ? "block" : "none";
   toggleBtn.textContent = isHidden ? "Hide Step-by-Step Work" : "Show Step-by-Step Work";
 });
+
+// Init scratchpad once
+initScratchpad();
